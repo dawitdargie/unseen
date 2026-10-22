@@ -3,6 +3,10 @@
 Status: Initial samples verified; full feasibility testing remains.
 Verification date: 2026-10-21
 
+Design update: 2026-10-22. Source feasibility is the required C04 milestone in [implementation_plan.md](implementation_plan.md); the design baseline does not claim these checks already pass.
+
+Initial canonical categories: Earth landscapes/caves/ecosystems; Universe planets-moons/nebulae/galaxies. The broader topic ideas below are a future catalog backlog.
+
 ## 1. Content Direction
 
 Unseen helps visitors discover extraordinary places on Earth and
@@ -110,11 +114,11 @@ image suitability, or every factual claim.
 ### Earth Selection Approach
 
 For the first version:
-1. Maintain a curated list of extraordinary topics.
-2. Fetch their content automatically.
-3. Validate explanations, images, and reuse conditions.
-4. Publish approved discoveries.
-5. Refresh stored records periodically.
+1. Maintain curated extraordinary topics resolved to stable English Wikipedia page IDs.
+2. Fetch those approved IDs automatically and resolve suitable Commons images/metadata.
+3. Normalize structurally valid results into pending import candidates.
+4. Review relevance, explanations, images, attribution, and reuse conditions.
+5. Apply approved candidates transactionally; refreshes stage proposed changes without overwriting the current public snapshot.
 
 Later:
 - Use focused searches or relevant categories to find candidates.
@@ -183,12 +187,12 @@ Observed results:
 
 ### Universe Selection Approach
 
-1. Search using focused astronomy topics and image filtering.
-2. Validate relevance and image-description consistency.
-3. Preserve scientific qualifications and uncertainty.
-4. Check attribution and reuse conditions.
-5. Publish approved discoveries.
-6. Refresh and expand the collection periodically.
+1. Search manually using focused astronomy topics and image filtering to select stable NASA record IDs.
+2. Store approved IDs as scheduled import targets; automated broad search ingestion is deferred.
+3. Fetch/normalize candidates and validate image-description consistency.
+4. Preserve scientific qualifications and uncertainty; review attribution and reuse conditions.
+5. Apply approved candidates transactionally.
+6. Stage refreshes for review and expand the approved target catalog explicitly.
 
 Use additional authoritative sources if a detail page needs facts
 that the selected NASA record does not provide.
@@ -198,10 +202,10 @@ that the selected NASA record does not provide.
 Dynamic content does not require newly discovered places every day.
 
 Unseen will:
-1. Fetch approved topics and search for candidate records on a schedule.
+1. Fetch approved stable Wikipedia/NASA record IDs on a schedule; use provider search manually to choose additional targets.
 2. Validate and normalize external responses.
-3. Save accepted records in PostgreSQL.
-4. Update existing records without creating duplicates.
+3. Save normalized candidates in PostgreSQL for review.
+4. Apply approved candidates transactionally without duplicate source identities; retain the public snapshot while an update is pending/rejected.
 5. Serve feeds, search, filters, and detail pages from PostgreSQL.
 6. Select a daily discovery from eligible published records.
 7. Keep existing content available when external services fail.
@@ -259,11 +263,12 @@ Text and image licensing must be handled separately.
 
 These are proposed Unseen settings, not provider update guarantees:
 
-- Candidate import: once daily.
-- Daily discovery selection: once daily.
+- Candidate import: daily at 01:00 UTC for approved targets not yet published.
+- Daily discovery selection: daily at 00:05 UTC, with a manual initial run.
 - Daily selection timezone: UTC.
-- Existing record refresh: weekly initially.
-- Failed requests: bounded retries with backoff.
+- Existing record refresh: Sundays at 02:00 UTC for approved published targets.
+- Transient failures: bounded retries with backoff, respecting provider retry guidance.
+- Permanent invalid/missing targets or unsupported metadata: disable the target with a diagnostic reason until manual review explicitly re-enables it.
 - Invalid updates: retain the last valid published version.
 - Missing images or unclear rights: hold the candidate for review.
 
@@ -302,8 +307,8 @@ This observation concerns the tested response, not every APOD record.
 
 ## 12. Remaining Feasibility Checks
 
-Before closing Step 03:
-- Test multiple records across every planned category.
+Before completing source feasibility in C04:
+- Verify at least one publishable record in each of the six initial categories, plus representative additional/provider failure cases. Expand sampling before expanding the taxonomy.
 - Verify extraordinary Earth topics have suitable publishable images.
 - Check that explanations support useful detail pages.
 - Verify image relevance, resolution, credits, and licenses.
@@ -327,7 +332,7 @@ Use these as the first sources to evaluate and integrate:
 Use curated selection plus automatic fetching and validation.
 
 These sources have passed initial sample checks.
-Step 03 remains open until the broader feasibility checks pass.
+Source feasibility (C04) remains open until the broader checks pass. A can close as an architecture/design baseline while this execution gate remains explicit.
 
 No external source is guaranteed to remain available or error-free.
 Unseen must preserve useful content independently of temporary outages.
@@ -351,3 +356,9 @@ https://www.mediawiki.org/wiki/API:Etiquette
 
 Wikimedia terms:
 https://foundation.wikimedia.org/wiki/Policy:Terms_of_Use
+
+## 15. Candidate and Publication Boundary
+
+The schema/API now persist available source revision IDs/URLs and adaptation notes. New/changed payloads enter import_candidates with a canonical content hash and the current discovery snapshot version as their base; fetching alone never approves publication. Internal commands review/apply/reject candidates. Applying updates the public snapshot and candidate state in one transaction and preserves the stable slug/first-publication timestamp.
+
+A repeated payload against the same snapshot version does not reopen an applied/rejected candidate. Applying requires a matching current/base version. An upstream A → B → A reversion creates a fresh reviewable candidate against the new base, rather than replaying old approval. Stale candidates cannot overwrite newer content. Structurally invalid responses update target error state/logs instead of replacing content. New rights concerns require review and unpublishing when appropriate. See [database_design.md](database_design.md) for the concrete model.
